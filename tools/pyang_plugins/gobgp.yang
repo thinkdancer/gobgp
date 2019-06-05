@@ -263,7 +263,7 @@ module gobgp {
     leaf update-recv-time {
       type int64;
       description
-        "The number of seconds elasped since January 1, 1970 UTC
+        "The number of seconds elapsed since January 1, 1970 UTC
         last time the BGP session received an UPDATE message";
     }
   }
@@ -304,6 +304,15 @@ module gobgp {
       default "false";
       description
         "Configure the neighbor as a route server client.";
+    }
+
+    leaf secondary-route {
+      type boolean;
+      default "false";
+      description
+        "if an export policy rejects a selected route, try the next route in
+        order until one that is accepted is found or all routes for the peer
+        are rejected.";
     }
   }
 
@@ -589,6 +598,18 @@ module gobgp {
       description
         "Enable feature for mirroring of received BGP messages
          mainly for debugging purpose";
+    }
+
+    leaf sys-name {
+      type string;
+      description
+        "Reference to the SysName of the BMP server";
+    }
+
+    leaf sys-descr {
+      type string;
+      description
+        "Reference to the SysDescr of the BMP server";
     }
   }
 
@@ -1203,13 +1224,20 @@ module gobgp {
     leaf version {
       type uint8;
       description
-        "Configure version of zebra protocol.  Default is 2. Supported up to 3.";
+        "Configure version of zebra protocol.  Default is 2.
+        Supported version are 2 or 3 for Quagga and 4, 5 or 6 for FRRouting.";
     }
     leaf nexthop-trigger-enable {
       type boolean;
     }
     leaf nexthop-trigger-delay {
       type uint8;
+    }
+    leaf mpls-label-range-size {
+      type uint32;
+      description
+        "Configure MPLS label range size which will be requested to
+        FRR/Zebra.";
     }
   }
 

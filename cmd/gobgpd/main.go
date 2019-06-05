@@ -26,6 +26,7 @@ import (
 	"runtime"
 	"syscall"
 
+	"github.com/coreos/go-systemd/daemon"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/jessevdk/go-flags"
 	"github.com/kr/pretty"
@@ -38,11 +39,10 @@ import (
 	"github.com/osrg/gobgp/internal/pkg/apiutil"
 	"github.com/osrg/gobgp/internal/pkg/config"
 	"github.com/osrg/gobgp/internal/pkg/table"
+	"github.com/osrg/gobgp/internal/pkg/version"
 	"github.com/osrg/gobgp/pkg/packet/bgp"
 	"github.com/osrg/gobgp/pkg/server"
 )
-
-var version = "master"
 
 func marshalRouteTargets(l []string) ([]*any.Any, error) {
 	rtList := make([]*any.Any, 0, len(l))
@@ -119,6 +119,7 @@ func main() {
 		Dry             bool   `short:"d" long:"dry-run" description:"check configuration"`
 		PProfHost       string `long:"pprof-host" description:"specify the host that gobgpd listens on for pprof" default:"localhost:6060"`
 		PProfDisable    bool   `long:"pprof-disable" description:"disable pprof profiling"`
+		UseSdNotify     bool   `long:"sdnotify" description:"use sd_notify protocol"`
 		TLS             bool   `long:"tls" description:"enable TLS authentication for gRPC API"`
 		TLSCertFile     string `long:"tls-cert-file" description:"The TLS cert file"`
 		TLSKeyFile      string `long:"tls-key-file" description:"The TLS key file"`
@@ -130,7 +131,7 @@ func main() {
 	}
 
 	if opts.Version {
-		fmt.Println("gobgpd version", version)
+		fmt.Println("gobgpd version", version.Version())
 		os.Exit(0)
 	}
 
@@ -205,6 +206,16 @@ func main() {
 	bgpServer := server.NewBgpServer(server.GrpcListenAddress(opts.GrpcHosts), server.GrpcOption(grpcOpts))
 	go bgpServer.Serve()
 
+	if opts.UseSdNotify {
+		if status, err := daemon.SdNotify(false, daemon.SdNotifyReady); !status {
+			if err != nil {
+				log.Warnf("Failed to send notification via sd_notify(): %s", err)
+			} else {
+				log.Warnf("The socket sd_notify() isn't available")
+			}
+		}
+	}
+
 	if opts.ConfigFile != "" {
 		go config.ReadConfigfileServe(opts.ConfigFile, opts.ConfigType, configCh)
 	}
@@ -215,6 +226,9 @@ func main() {
 			select {
 			case <-sigCh:
 				bgpServer.StopBgp(context.Background(), &api.StopBgpRequest{})
+				if opts.UseSdNotify {
+					daemon.SdNotify(false, daemon.SdNotifyStopping)
+				}
 				return
 			case newConfig := <-configCh:
 				var added, deleted, updated []config.Neighbor
@@ -241,6 +255,8 @@ func main() {
 							Version:              uint32(c.Zebra.Config.Version),
 							NexthopTriggerEnable: c.Zebra.Config.NexthopTriggerEnable,
 							NexthopTriggerDelay:  uint32(c.Zebra.Config.NexthopTriggerDelay),
+							MplsLabelRangeSize:   uint32(c.Zebra.Config.MplsLabelRangeSize),
+							SoftwareName:         c.Zebra.Config.SoftwareName,
 						}); err != nil {
 							log.Fatalf("failed to set zebra config: %s", err)
 						}
@@ -263,6 +279,8 @@ func main() {
 						if err := bgpServer.AddBmp(context.Background(), &api.AddBmpRequest{
 							Address:           c.Config.Address,
 							Port:              c.Config.Port,
+							SysName:           c.Config.SysName,
+							SysDescr:          c.Config.SysDescr,
 							Policy:            api.AddBmpRequest_MonitoringPolicy(c.Config.RouteMonitoringPolicy.ToInt()),
 							StatisticsTimeout: int32(c.Config.StatisticsTimeout),
 						}); err != nil {
@@ -373,21 +391,13 @@ func main() {
 					}
 				}
 				for _, pg := range updatedPg {
-					log.Infof("PeerGroup %v is updated", pg.State.PeerGroupName)
+					log.Infof("PeerGroup %s is updated", pg.Config.PeerGroupName)
 					if u, err := bgpServer.UpdatePeerGroup(context.Background(), &api.UpdatePeerGroupRequest{
 						PeerGroup: config.NewPeerGroupFromConfigStruct(&pg),
 					}); err != nil {
 						log.Warn(err)
 					} else {
 						updatePolicy = updatePolicy || u.NeedsSoftResetIn
-					}
-				}
-				for _, pg := range updatedPg {
-					log.Infof("PeerGroup %s is updated", pg.Config.PeerGroupName)
-					if _, err := bgpServer.UpdatePeerGroup(context.Background(), &api.UpdatePeerGroupRequest{
-						PeerGroup: config.NewPeerGroupFromConfigStruct(&pg),
-					}); err != nil {
-						log.Warn(err)
 					}
 				}
 				for _, dn := range newConfig.DynamicNeighbors {

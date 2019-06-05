@@ -1,4 +1,4 @@
-// Copyright (C) 2015 Nippon Telegraph and Telephone Corporation.
+// Copyright (C) 2019 Nippon Telegraph and Telephone Corporation.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,21 +13,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+// +build tools
+
+package tools
 
 import (
-	"fmt"
-	"os"
-
-	"github.com/osrg/gobgp/internal/pkg/version"
-	"google.golang.org/grpc"
+	_ "github.com/golang/protobuf/protoc-gen-go"
 )
-
-func main() {
-	if len(os.Args) > 1 && os.Args[1] == "--version" {
-		fmt.Println("gobgp version", version.Version())
-		os.Exit(0)
-	}
-	grpc.EnableTracing = false
-	newRootCmd().Execute()
-}

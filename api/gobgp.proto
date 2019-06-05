@@ -21,9 +21,9 @@
 
 syntax = "proto3";
 
-import "google/protobuf/any.proto";
-import "google/protobuf/empty.proto";
-import "google/protobuf/timestamp.proto";
+import "any/any.proto";
+import "empty/empty.proto";
+import "timestamp/timestamp.proto";
 
 package gobgpapi;
 
@@ -227,6 +227,7 @@ message ListPathRequest {
     PREFIX = 1;
   }
   SortType sort_type = 5;
+  bool enable_filtered = 6;
 }
 
 message ListPathResponse {
@@ -414,6 +415,8 @@ message EnableZebraRequest {
   uint32 version = 3;
   bool nexthop_trigger_enable = 4;
   uint32 nexthop_trigger_delay = 5;
+  uint32 mpls_label_range_size = 6;
+  string software_name = 7;
 }
 
 message EnableMrtRequest {
@@ -438,6 +441,8 @@ message AddBmpRequest {
   }
   MonitoringPolicy policy = 3;
   int32 StatisticsTimeout = 4;
+  string SysName = 5;
+  string SysDescr = 6;
 }
 
 message DeleteBmpRequest {
@@ -515,6 +520,7 @@ message Path {
   // - EVPNInclusiveMulticastEthernetTagRoute
   // - EVPNEthernetSegmentRoute
   // - EVPNIPPrefixRoute
+  // - EVPNIPMSIRoute
   // - LabeledVPNIPAddressPrefix
   // - RouteTargetMembershipNLRI
   // - FlowSpecNLRI
@@ -769,6 +775,7 @@ message Transport {
 
 message RouteServer {
   bool route_server_client = 1;
+  bool secondary_route = 2;
 }
 
 message GracefulRestart {

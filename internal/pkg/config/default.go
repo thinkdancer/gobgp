@@ -349,7 +349,14 @@ func setDefaultConfigValuesWithViper(v *viper.Viper, b *BgpConfigSet) error {
 		return err
 	}
 
+	bmpSysPrefix := "Gobgp-R"
 	for idx, server := range b.BmpServers {
+		if server.Config.SysName == "" {
+			server.Config.SysName = bmpSysPrefix + strconv.Itoa(idx)
+		}
+		if server.Config.SysDescr == "" {
+			server.Config.SysDescr = "Gobgp Version: master"
+		}
 		if server.Config.Port == 0 {
 			server.Config.Port = bmp.BMP_DEFAULT_PORT
 		}
@@ -406,11 +413,25 @@ func setDefaultConfigValuesWithViper(v *viper.Viper, b *BgpConfigSet) error {
 	} else if b.Zebra.Config.Version > zebra.MaxZapiVer {
 		b.Zebra.Config.Version = zebra.MaxZapiVer
 	}
+
 	if !v.IsSet("zebra.config.nexthop-trigger-enable") && !b.Zebra.Config.NexthopTriggerEnable && b.Zebra.Config.Version > 2 {
 		b.Zebra.Config.NexthopTriggerEnable = true
 	}
 	if b.Zebra.Config.NexthopTriggerDelay == 0 {
 		b.Zebra.Config.NexthopTriggerDelay = 5
+	}
+
+	//SoftwareName for Zebra
+	allowableZebraSoftwareName := []string{"", "quagga", "frr3", "frr4", "frr5", "frr6", "frr7"}
+	isAllowable := false
+	for _, allowable := range allowableZebraSoftwareName {
+		if b.Zebra.Config.SoftwareName == allowable {
+			isAllowable = true
+			break
+		}
+	}
+	if !isAllowable {
+		b.Zebra.Config.SoftwareName = ""
 	}
 
 	list, err := extractArray(v.Get("neighbors"))
